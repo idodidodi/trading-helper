@@ -49,7 +49,7 @@ export async function updateSession(request) {
   }
 
   // Redirect authenticated users away from auth pages
-  const authPaths = ['/login', '/signup'];
+  const authPaths = ['/login', '/signup', '/forgot-password'];
   const isAuthPage = authPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
