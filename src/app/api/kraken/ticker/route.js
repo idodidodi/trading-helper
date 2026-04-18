@@ -1,4 +1,4 @@
-import { getTickerPrice } from '@/lib/kraken';
+import { getTickerPrice, getFuturesTickerPrice, isFuturesSymbol } from '@/lib/kraken';
 
 export async function GET(request) {
   const { searchParams } = request.nextUrl;
@@ -10,18 +10,39 @@ export async function GET(request) {
 
   try {
     const pairList = pairs.split(',').map((p) => p.trim());
-    const tickerData = await getTickerPrice(pairList);
 
-    // Extract just the essential price info
+    // Split into spot and futures
+    const spotPairs = pairList.filter((p) => !isFuturesSymbol(p));
+    const futuresPairs = pairList.filter((p) => isFuturesSymbol(p));
+
     const prices = {};
-    for (const [key, data] of Object.entries(tickerData)) {
-      prices[key] = {
-        last: parseFloat(data.c[0]),
-        volume: parseFloat(data.v[1]), // 24h volume
-        high: parseFloat(data.h[1]),   // 24h high
-        low: parseFloat(data.l[1]),    // 24h low
-        open: parseFloat(data.o),      // Today's opening
-      };
+
+    // Fetch spot prices
+    if (spotPairs.length > 0) {
+      const tickerData = await getTickerPrice(spotPairs);
+      for (const [key, data] of Object.entries(tickerData)) {
+        prices[key] = {
+          last: parseFloat(data.c[0]),
+          volume: parseFloat(data.v[1]),
+          high: parseFloat(data.h[1]),
+          low: parseFloat(data.l[1]),
+          open: parseFloat(data.o),
+        };
+      }
+    }
+
+    // Fetch futures prices
+    if (futuresPairs.length > 0) {
+      const futuresData = await getFuturesTickerPrice(futuresPairs);
+      for (const [key, data] of Object.entries(futuresData)) {
+        prices[key] = {
+          last: data.last,
+          volume: data.volume,
+          high: data.high,
+          low: data.low,
+          open: data.open,
+        };
+      }
     }
 
     return Response.json({ prices });

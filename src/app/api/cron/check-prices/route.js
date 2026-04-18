@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server';
-import { getTickerPrice, getOHLC, extractPrice } from '@/lib/kraken';
+import { getTickerPrice, getOHLC, extractPrice, getFuturesTickerPrice, isFuturesSymbol } from '@/lib/kraken';
 import { checkBollingerCrossing } from '@/lib/bollinger';
 import { dispatchNotifications } from '@/lib/notifications/index';
 
@@ -55,15 +55,27 @@ export async function GET(request) {
       return Response.json({ message: 'No active alerts', ...results });
     }
 
-    // 2. Deduplicate tickers across all users
+    // 2. Deduplicate tickers across all users and split by type
     const uniquePairs = [...new Set(activeAlerts.map((a) => a.ticker))];
+    const spotPairs = uniquePairs.filter((p) => !isFuturesSymbol(p));
+    const futuresPairs = uniquePairs.filter((p) => isFuturesSymbol(p));
     
-    // 3. Batch fetch all prices in one call
+    // 3. Batch fetch prices from both APIs
     let prices = {};
     try {
-      const tickerData = await getTickerPrice(uniquePairs);
-      for (const [key, data] of Object.entries(tickerData)) {
-        prices[key] = extractPrice(data);
+      // Spot prices
+      if (spotPairs.length > 0) {
+        const tickerData = await getTickerPrice(spotPairs);
+        for (const [key, data] of Object.entries(tickerData)) {
+          prices[key] = extractPrice(data);
+        }
+      }
+      // Futures prices
+      if (futuresPairs.length > 0) {
+        const futuresData = await getFuturesTickerPrice(futuresPairs);
+        for (const [key, data] of Object.entries(futuresData)) {
+          prices[key] = data.last;
+        }
       }
     } catch (error) {
       results.errors.push(`Ticker fetch error: ${error.message}`);

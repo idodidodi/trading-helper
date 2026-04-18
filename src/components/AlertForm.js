@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export default function AlertForm({ alert, onSave, onClose, pairs }) {
   const isEditing = !!alert?.id;
@@ -19,22 +19,90 @@ export default function AlertForm({ alert, onSave, onClose, pairs }) {
   const [loading, setLoading] = useState(false);
   const [pairSearch, setPairSearch] = useState('');
   const [showPairDropdown, setShowPairDropdown] = useState(false);
+  const [livePrice, setLivePrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const priceIntervalRef = useRef(null);
+  const hasAutoFilled = useRef(false);
 
   const isBollinger = form.alert_type.startsWith('bollinger_');
 
   const filteredPairs = (pairs || []).filter((p) =>
     (p.wsname || p.altname || '').toLowerCase().includes(pairSearch.toLowerCase())
-  ).slice(0, 20);
+  ).slice(0, 25);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  // Fetch the current price for the selected ticker
+  const fetchPrice = useCallback(async (ticker) => {
+    if (!ticker) return;
+    try {
+      setPriceLoading(true);
+      const res = await fetch(`/api/kraken/ticker?pairs=${encodeURIComponent(ticker)}`);
+      const data = await res.json();
+      if (data.prices) {
+        // Find the price — key might differ from ticker for spot pairs
+        const priceKey = Object.keys(data.prices)[0];
+        if (priceKey) {
+          const price = data.prices[priceKey].last;
+          setLivePrice(price);
+          return price;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching live price:', err);
+    } finally {
+      setPriceLoading(false);
+    }
+    return null;
+  }, []);
+
   function handleSelectPair(pair) {
-    setForm((prev) => ({ ...prev, ticker: pair.altname || pair.id }));
+    const tickerId = pair.altname || pair.id;
+    setForm((prev) => ({ ...prev, ticker: tickerId }));
     setPairSearch(pair.wsname || pair.altname);
     setShowPairDropdown(false);
+    setLivePrice(null);
+    hasAutoFilled.current = false;
+
+    // Fetch price immediately and auto-fill target value
+    fetchPrice(tickerId).then((price) => {
+      if (price !== null && !hasAutoFilled.current) {
+        hasAutoFilled.current = true;
+        setForm((prev) => {
+          // Only auto-fill if target_value is empty
+          if (!prev.target_value || prev.target_value === '') {
+            return { ...prev, target_value: price };
+          }
+          return prev;
+        });
+      }
+    });
   }
+
+  // Poll live price every 5 seconds when a ticker is selected
+  useEffect(() => {
+    if (priceIntervalRef.current) {
+      clearInterval(priceIntervalRef.current);
+      priceIntervalRef.current = null;
+    }
+
+    if (form.ticker) {
+      // Initial fetch
+      fetchPrice(form.ticker);
+      // Poll every 5s
+      priceIntervalRef.current = setInterval(() => {
+        fetchPrice(form.ticker);
+      }, 5000);
+    }
+
+    return () => {
+      if (priceIntervalRef.current) {
+        clearInterval(priceIntervalRef.current);
+      }
+    };
+  }, [form.ticker, fetchPrice]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -59,8 +127,18 @@ export default function AlertForm({ alert, onSave, onClose, pairs }) {
         (p) => p.altname === alert.ticker || p.id === alert.ticker
       );
       setPairSearch(found?.wsname || alert.ticker);
+      hasAutoFilled.current = true; // Don't overwrite existing target when editing
     }
   }, [alert, pairs]);
+
+  // Format price for display
+  function formatPrice(price) {
+    if (price === null || price === undefined) return '—';
+    if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (price >= 1) return price.toFixed(4);
+    if (price >= 0.001) return price.toFixed(6);
+    return price.toFixed(8);
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -68,55 +146,100 @@ export default function AlertForm({ alert, onSave, onClose, pairs }) {
         <h2>{isEditing ? 'Edit Alert' : 'New Alert'}</h2>
 
         <form className="modal-form" onSubmit={handleSubmit}>
-          {/* Ticker Search */}
+          {/* Ticker Search + Live Price */}
           <div className="input-group" style={{ position: 'relative' }}>
             <label>Ticker</label>
-            <input
-              className="input"
-              placeholder="Search pairs (e.g. BTC/USD)"
-              value={pairSearch}
-              onChange={(e) => {
-                setPairSearch(e.target.value);
-                setShowPairDropdown(true);
-              }}
-              onFocus={() => setShowPairDropdown(true)}
-              autoComplete="off"
-            />
-            {showPairDropdown && filteredPairs.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  className="input"
+                  placeholder="Search pairs (e.g. BTC/USD, DOGE Perp)"
+                  value={pairSearch}
+                  onChange={(e) => {
+                    setPairSearch(e.target.value);
+                    setShowPairDropdown(true);
+                  }}
+                  onFocus={() => setShowPairDropdown(true)}
+                  autoComplete="off"
+                />
+                {showPairDropdown && filteredPairs.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      zIndex: 10,
+                      marginTop: 4,
+                    }}
+                  >
+                    {filteredPairs.map((p) => (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectPair(p)}
+                        style={{
+                          padding: '8px 14px',
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          borderBottom: '1px solid var(--border-color)',
+                          transition: 'background 0.15s',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-input-focus)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <strong>{p.wsname || p.altname}</strong>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            background: p.type === 'perpetual' ? 'var(--accent-purple)' : 'var(--accent-cyan)',
+                            color: '#fff',
+                            opacity: 0.9,
+                          }}
+                        >
+                          {p.type === 'perpetual' ? 'Perp' : 'Spot'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Live price display */}
               <div
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  maxHeight: 200,
-                  overflowY: 'auto',
-                  background: 'var(--bg-secondary)',
+                  minWidth: 110,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--bg-input)',
                   border: '1px solid var(--border-color)',
                   borderRadius: 'var(--radius-md)',
-                  zIndex: 10,
-                  marginTop: 4,
+                  padding: '0 12px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                  color: livePrice !== null ? 'var(--accent-green)' : 'var(--text-tertiary)',
+                  transition: 'color 0.3s',
                 }}
               >
-                {filteredPairs.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() => handleSelectPair(p)}
-                    style={{
-                      padding: '8px 14px',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      borderBottom: '1px solid var(--border-color)',
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = 'var(--bg-input-focus)')}
-                    onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-                  >
-                    <strong>{p.wsname || p.altname}</strong>
-                  </div>
-                ))}
+                {priceLoading && livePrice === null
+                  ? '...'
+                  : livePrice !== null
+                    ? `$${formatPrice(livePrice)}`
+                    : '—'}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Platform */}
