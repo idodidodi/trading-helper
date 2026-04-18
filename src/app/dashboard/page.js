@@ -202,23 +202,33 @@ export default function DashboardPage() {
                     <th>Ticker</th>
                     <th>Platform</th>
                     <th>Type</th>
-                    <th>Target / Config</th>
+                    <th>Target</th>
+                    <th>Current Price</th>
+                    <th>Diff %</th>
                     <th>Last Triggered</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {alerts.map((alert) => (
-                    <AlertRow
-                      key={alert.id}
-                      alert={alert}
-                      displayName={getDisplayName(alert.ticker)}
-                      onEdit={handleEdit}
-                      onDuplicate={handleDuplicate}
-                      onDelete={handleDelete}
-                      onToggle={handleToggle}
-                    />
-                  ))}
+                  {alerts.map((alert) => {
+                    const priceEntry = Object.entries(prices).find(
+                      ([key]) => key.toUpperCase().includes(alert.ticker.toUpperCase()) || key === alert.ticker
+                    );
+                    const currentPrice = priceEntry ? priceEntry[1].last : null;
+
+                    return (
+                      <AlertRow
+                        key={alert.id}
+                        alert={alert}
+                        displayName={getDisplayName(alert.ticker)}
+                        currentPrice={currentPrice}
+                        onEdit={handleEdit}
+                        onDuplicate={handleDuplicate}
+                        onDelete={handleDelete}
+                        onToggle={handleToggle}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

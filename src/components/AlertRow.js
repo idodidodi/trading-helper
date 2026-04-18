@@ -1,6 +1,6 @@
 'use client';
 
-export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggle, displayName }) {
+export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggle, displayName, currentPrice }) {
   const typeLabels = {
     price_above: '▲ Above',
     price_below: '▼ Below',
@@ -38,6 +38,18 @@ export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggl
     });
   }
 
+  function formatDiff(current, target) {
+    if (!current || !target) return '—';
+    const diff = ((current - target) / target) * 100;
+    const color = diff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    const sign = diff >= 0 ? '+' : '';
+    return (
+      <span style={{ color, fontWeight: 600, fontFamily: 'monospace' }}>
+        {sign}{diff.toFixed(2)}%
+      </span>
+    );
+  }
+
   return (
     <tr>
       <td>
@@ -54,10 +66,19 @@ export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggl
         {alert.alert_type.startsWith('price_') ? (
           <span className="value">{formatValue(alert.target_value)}</span>
         ) : (
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            P:{alert.bb_period} M:{alert.bb_multiplier} T:{alert.bb_timeframe}m
+          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            P:{alert.bb_period} M:{alert.bb_multiplier} {alert.bb_timeframe}m
           </span>
         )}
+      </td>
+      <td style={{ fontWeight: 500, fontFamily: 'monospace' }}>
+        {currentPrice ? formatValue(currentPrice) : '—'}
+      </td>
+      <td>
+        {alert.alert_type.startsWith('price_') 
+          ? formatDiff(currentPrice, alert.target_value)
+          : '—'
+        }
       </td>
       <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
         {formatTime(alert.last_triggered_at)}
