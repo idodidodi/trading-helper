@@ -64,6 +64,21 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [alerts, fetchPrices]);
 
+  // Build a lookup: ticker symbol → human-readable name
+  function getDisplayName(ticker) {
+    const pair = pairs.find((p) => p.altname === ticker || p.id === ticker);
+    return pair?.wsname || ticker;
+  }
+
+  // Smart price formatting (avoids "$0.1" for small values)
+  function formatTickerPrice(price) {
+    if (price === null || price === undefined) return '...';
+    if (price >= 1000) return `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (price >= 1) return `$${price.toFixed(4)}`;
+    if (price >= 0.001) return `$${price.toFixed(6)}`;
+    return `$${price.toFixed(8)}`;
+  }
+
   // CRUD handlers
   async function handleSave(formData, isEditing) {
     const method = isEditing ? 'PUT' : 'POST';
@@ -106,22 +121,6 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleAdjust(id, percent) {
-    const alert = alerts.find((a) => a.id === id);
-    if (!alert || !alert.target_value) return;
-    const newValue = parseFloat(alert.target_value) * (1 + percent / 100);
-    try {
-      await fetch('/api/alerts', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, target_value: newValue }),
-      });
-      await fetchAlerts();
-    } catch (error) {
-      console.error('Error adjusting alert:', error);
-    }
-  }
-
   function handleDuplicate(alert) {
     setEditingAlert({
       ...alert,
@@ -155,14 +154,14 @@ export default function DashboardPage() {
           <div className="price-ticker">
             {uniqueTickers.slice(0, 5).map((ticker) => {
               const priceEntry = Object.entries(prices).find(
-                ([key]) => key.toUpperCase().includes(ticker.toUpperCase())
+                ([key]) => key.toUpperCase().includes(ticker.toUpperCase()) || key === ticker
               );
               const price = priceEntry ? priceEntry[1].last : null;
               return (
                 <div className="price-badge" key={ticker}>
-                  <span className="ticker-name">{ticker}</span>
+                  <span className="ticker-name">{getDisplayName(ticker)}</span>
                   <span className="ticker-price">
-                    {price ? `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '...'}
+                    {formatTickerPrice(price)}
                   </span>
                 </div>
               );
@@ -213,11 +212,11 @@ export default function DashboardPage() {
                     <AlertRow
                       key={alert.id}
                       alert={alert}
+                      displayName={getDisplayName(alert.ticker)}
                       onEdit={handleEdit}
                       onDuplicate={handleDuplicate}
                       onDelete={handleDelete}
                       onToggle={handleToggle}
-                      onAdjust={handleAdjust}
                     />
                   ))}
                 </tbody>

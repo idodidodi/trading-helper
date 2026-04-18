@@ -280,15 +280,40 @@ export default function AlertForm({ alert, onSave, onClose, pairs }) {
           {!isBollinger && (
             <div className="input-group">
               <label>Target Price ($)</label>
-              <input
-                className="input"
-                type="number"
-                step="any"
-                placeholder="e.g. 70000"
-                value={form.target_value}
-                onChange={(e) => handleChange('target_value', e.target.value)}
-                required
-              />
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ minWidth: 50, fontSize: 12, padding: '6px 10px' }}
+                  onClick={() => {
+                    const current = parseFloat(form.target_value);
+                    if (!isNaN(current)) handleChange('target_value', (current * 0.99).toFixed(8).replace(/\.?0+$/, ''));
+                  }}
+                >
+                  −1%
+                </button>
+                <input
+                  className="input"
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 70000"
+                  value={form.target_value}
+                  onChange={(e) => handleChange('target_value', e.target.value)}
+                  required
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ minWidth: 50, fontSize: 12, padding: '6px 10px' }}
+                  onClick={() => {
+                    const current = parseFloat(form.target_value);
+                    if (!isNaN(current)) handleChange('target_value', (current * 1.01).toFixed(8).replace(/\.?0+$/, ''));
+                  }}
+                >
+                  +1%
+                </button>
+              </div>
             </div>
           )}
 

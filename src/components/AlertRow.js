@@ -1,6 +1,6 @@
 'use client';
 
-export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggle, onAdjust }) {
+export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggle, displayName }) {
   const typeLabels = {
     price_above: '▲ Above',
     price_below: '▼ Below',
@@ -25,8 +25,9 @@ export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggl
     if (!val) return '—';
     const num = parseFloat(val);
     if (num >= 1000) return `$${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-    if (num >= 1) return `$${num.toFixed(2)}`;
-    return `$${num.toFixed(6)}`;
+    if (num >= 1) return `$${num.toFixed(4)}`;
+    if (num >= 0.001) return `$${num.toFixed(6)}`;
+    return `$${num.toFixed(8)}`;
   }
 
   function formatTime(ts) {
@@ -42,7 +43,7 @@ export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggl
       <td>
         <span className={`status-dot ${statusClass}`} title={statusClass}></span>
       </td>
-      <td style={{ fontWeight: 600 }}>{alert.ticker}</td>
+      <td style={{ fontWeight: 600 }}>{displayName || alert.ticker}</td>
       <td style={{ textTransform: 'capitalize' }}>{alert.platform}</td>
       <td>
         <span className={`alert-type-badge ${typeClasses[alert.alert_type] || ''}`}>
@@ -51,23 +52,7 @@ export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggl
       </td>
       <td>
         {alert.alert_type.startsWith('price_') ? (
-          <div className="value-adjust">
-            <button
-              className="btn-adjust"
-              onClick={() => onAdjust(alert.id, -1)}
-              title="-1%"
-            >
-              -1%
-            </button>
-            <span className="value">{formatValue(alert.target_value)}</span>
-            <button
-              className="btn-adjust"
-              onClick={() => onAdjust(alert.id, 1)}
-              title="+1%"
-            >
-              +1%
-            </button>
-          </div>
+          <span className="value">{formatValue(alert.target_value)}</span>
         ) : (
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
             P:{alert.bb_period} M:{alert.bb_multiplier} T:{alert.bb_timeframe}m
