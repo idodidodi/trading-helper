@@ -1,0 +1,1 @@
+### Verify that on password reset passwrod 1 different from password 2 not successful
