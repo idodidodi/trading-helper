@@ -415,32 +415,7 @@ a:hover {
   font-weight: 700;
 }
 
-.dashboard-header .price-ticker {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
 
-.price-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: var(--bg-glass);
-  border: 1px solid var(--bg-glass-border);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-}
-
-.price-badge .ticker-name {
-  font-weight: 600;
-  color: var(--accent-cyan);
-}
-
-.price-badge .ticker-price {
-  font-weight: 500;
-  color: var(--text-primary);
-}
 
 /* --- Alert Table --- */
 .alerts-section {

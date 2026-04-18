@@ -79,7 +79,38 @@ export default function DashboardPage() {
     return `$${price.toFixed(8)}`;
   }
 
+  const [scanning, setScanning] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLocalhost(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('10.0.0.'));
+    }
+  }, []);
+
   // CRUD handlers
+  async function handleScan() {
+    setScanning(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/alerts/scan', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setStatusMessage({ type: 'success', text: data.message });
+        await fetchAlerts();
+      } else {
+        setStatusMessage({ type: 'error', text: data.error || 'Scan failed' });
+      }
+    } catch (error) {
+      setStatusMessage({ type: 'error', text: 'Network error during scan' });
+    } finally {
+      setScanning(false);
+      // Auto-clear message after 5 seconds
+      setTimeout(() => setStatusMessage(null), 5000);
+    }
+  }
+
   async function handleSave(formData, isEditing) {
     const method = isEditing ? 'PUT' : 'POST';
     try {
@@ -151,31 +182,46 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="dashboard-header">
           <h1>Price Alerts</h1>
-          <div className="price-ticker">
-            {uniqueTickers.slice(0, 5).map((ticker) => {
-              const priceEntry = Object.entries(prices).find(
-                ([key]) => key.toUpperCase().includes(ticker.toUpperCase()) || key === ticker
-              );
-              const price = priceEntry ? priceEntry[1].last : null;
-              return (
-                <div className="price-badge" key={ticker}>
-                  <span className="ticker-name">{getDisplayName(ticker)}</span>
-                  <span className="ticker-price">
-                    {formatTickerPrice(price)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
+
+        {/* Global Status Message */}
+        {statusMessage && (
+          <div className={`status-alert ${statusMessage.type}`} style={{
+            marginBottom: '20px',
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-md)',
+            background: statusMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+            border: `1px solid ${statusMessage.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)'}`,
+            color: statusMessage.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)',
+            fontSize: '14px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            <span>{statusMessage.text}</span>
+            <button onClick={() => setStatusMessage(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '18px' }}>×</button>
+          </div>
+        )}
 
         {/* Alerts Section */}
         <div className="alerts-section">
           <div className="section-header">
             <h2>Active Alerts ({alerts.filter((a) => a.is_active && !a.is_triggered).length})</h2>
-            <button className="btn btn-primary" onClick={handleNew}>
-              + New Alert
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {isLocalhost && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={handleScan}
+                  disabled={scanning}
+                >
+                  {scanning ? <span className="spinner"></span> : '🔍 Scan Alerts'}
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={handleNew}>
+                + New Alert
+              </button>
+            </div>
           </div>
 
           {loading ? (
