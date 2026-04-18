@@ -42,11 +42,12 @@ export default function LoginPage() {
 
         {error && <div className="auth-error">{error}</div>}
 
-        <form className="auth-form" onSubmit={handleLogin}>
+        <form className="auth-form" onSubmit={handleLogin} method="POST">
           <div className="input-group">
             <label htmlFor="email">Email</label>
             <input
               id="email"
+              name="email"
               type="email"
               className="input"
               placeholder="you@example.com"
@@ -61,6 +62,7 @@ export default function LoginPage() {
             <label htmlFor="password">Password</label>
             <input
               id="password"
+              name="password"
               type="password"
               className="input"
               placeholder="••••••••"
@@ -74,6 +76,7 @@ export default function LoginPage() {
           <div className="checkbox-group">
             <input
               id="remember"
+              name="remember"
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}

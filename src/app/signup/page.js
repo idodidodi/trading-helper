@@ -15,7 +15,9 @@ export default function SignupPage() {
   const router = useRouter();
 
   async function handleSignup(e) {
+    console.log('Signup attempt started...');
     e.preventDefault();
+    console.log('Prevented default, email:', email);
     setError('');
 
     if (password !== confirmPassword) {
@@ -37,11 +39,14 @@ export default function SignupPage() {
     });
 
     if (authError) {
+      console.error('Signup error:', authError);
+      alert('Signup failed: ' + authError.message);
       setError(authError.message);
       setLoading(false);
       return;
     }
 
+    console.log('Signup success!');
     setSuccess(true);
     setLoading(false);
   }
@@ -71,11 +76,12 @@ export default function SignupPage() {
 
         {error && <div className="auth-error">{error}</div>}
 
-        <form className="auth-form" onSubmit={handleSignup}>
+        <form className="auth-form" onSubmit={handleSignup} method="POST">
           <div className="input-group">
             <label htmlFor="email">Email</label>
             <input
               id="email"
+              name="email"
               type="email"
               className="input"
               placeholder="you@example.com"
@@ -90,6 +96,7 @@ export default function SignupPage() {
             <label htmlFor="password">Password</label>
             <input
               id="password"
+              name="password"
               type="password"
               className="input"
               placeholder="Min 6 characters"
@@ -105,6 +112,7 @@ export default function SignupPage() {
             <label htmlFor="confirm-password">Confirm Password</label>
             <input
               id="confirm-password"
+              name="confirm-password"
               type="password"
               className="input"
               placeholder="Repeat password"
