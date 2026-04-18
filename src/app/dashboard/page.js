@@ -45,18 +45,25 @@ export default function DashboardPage() {
 
     // Filter to only tickers that are currently visible on screen
     const uniqueTickers = [...new Set(alerts.map((a) => a.ticker))];
-    const tickersToFetch = uniqueTickers.filter(t => visibleTickers[t]);
+    
+    // If we have few alerts, just fetch all to avoid visibility sync issues.
+    // If we have many, only fetch what's on screen.
+    const tickersToFetch = uniqueTickers.length < 20 
+      ? uniqueTickers 
+      : uniqueTickers.filter(t => visibleTickers[t]);
 
     if (tickersToFetch.length === 0) return;
     
     try {
       const res = await fetch(`/api/kraken/ticker?pairs=${tickersToFetch.join(',')}`);
       const data = await res.json();
-      if (data.prices) setPrices(data.prices);
+      if (data.prices) {
+        setPrices(prev => ({ ...prev, ...data.prices }));
+      }
     } catch (error) {
       console.error('Error fetching prices:', error);
     }
-  }, [alerts]);
+  }, [alerts, visibleTickers]);
 
   useEffect(() => {
     fetchAlerts();
@@ -271,9 +278,11 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {alerts.filter(a => !a.is_triggered).map((alert) => {
-                    const priceEntry = Object.entries(prices).find(
-                      ([key]) => key.toUpperCase().includes(alert.ticker.toUpperCase()) || key === alert.ticker
-                    );
+                    const cleanTicker = alert.ticker.replace(/[\/\s-]/g, '').toUpperCase();
+                    const priceEntry = Object.entries(prices).find(([key]) => {
+                      const cleanKey = key.replace(/[\/\s-]/g, '').replace(/^(PF_|PI_|X|Z)/, '').toUpperCase();
+                      return cleanKey === cleanTicker || key.toUpperCase().includes(cleanTicker) || cleanTicker.includes(cleanKey);
+                    });
                     const currentPrice = priceEntry ? priceEntry[1].last : null;
 
                     return (
@@ -320,9 +329,11 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {alerts.filter(a => a.is_triggered).map((alert) => {
-                    const priceEntry = Object.entries(prices).find(
-                      ([key]) => key.toUpperCase().includes(alert.ticker.toUpperCase()) || key === alert.ticker
-                    );
+                    const cleanTicker = alert.ticker.replace(/[\/\s-]/g, '').toUpperCase();
+                    const priceEntry = Object.entries(prices).find(([key]) => {
+                      const cleanKey = key.replace(/[\/\s-]/g, '').replace(/^(PF_|PI_|X|Z)/, '').toUpperCase();
+                      return cleanKey === cleanTicker || key.toUpperCase().includes(cleanTicker) || cleanTicker.includes(cleanKey);
+                    });
                     const currentPrice = priceEntry ? priceEntry[1].last : null;
 
                     return (
