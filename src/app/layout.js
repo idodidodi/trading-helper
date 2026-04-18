@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Alert Manager — Crypto Price Alerts",
+  title: "Trading Helper — Crypto Price Alerts",
   description: "Real-time crypto price alerts with Telegram, Web Push, and more. Monitor Kraken markets with Bollinger Bands and custom thresholds.",
 };
 
