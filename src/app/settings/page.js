@@ -9,10 +9,22 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [botUsername, setBotUsername] = useState(null);
 
   useEffect(() => {
     loadSettings();
+    fetchBotInfo();
   }, []);
+
+  async function fetchBotInfo() {
+    try {
+      const res = await fetch('/api/telegram/info');
+      const data = await res.json();
+      if (data.username) setBotUsername(data.username);
+    } catch (e) {
+      console.error('Failed to fetch bot info:', e);
+    }
+  }
 
   async function loadSettings() {
     const supabase = createClient();
@@ -179,15 +191,24 @@ export default function SettingsPage() {
               >
                 <strong>How to get your Chat ID:</strong>
                 <ol style={{ paddingLeft: 20, marginTop: 6 }}>
-                  <li>Open Telegram and search for our bot</li>
-                  <li>Click <strong>Start</strong> or send any message</li>
+                  <li>Open Telegram and search for <strong>@userinfobot</strong></li>
+                  <li>Copy the ID and paste it in the field above</li>
                   <li>
-                    Visit{' '}
-                    <code style={{ background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4 }}>
-                      https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates
-                    </code>
+                    <strong>Final Step:</strong> Click{' '}
+                    {botUsername ? (
+                      <a 
+                        href={`https://t.me/${botUsername}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--accent-cyan)', fontWeight: 600, textDecoration: 'underline' }}
+                      >
+                        here to open @{botUsername}
+                      </a>
+                    ) : (
+                      "to find our bot"
+                    )}{' '}
+                    and click <strong>Start</strong> so it has permission to message you.
                   </li>
-                  <li>Find your <code style={{ background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4 }}>chat.id</code> in the response</li>
                 </ol>
               </div>
             </div>

@@ -1,6 +1,6 @@
-'use client';
+import { useEffect, useRef } from 'react';
 
-export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggle, displayName, currentPrice }) {
+export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggle, displayName, currentPrice, onVisibilityChange }) {
   const typeLabels = {
     price_above: '▲ Above',
     price_below: '▼ Below',
@@ -42,16 +42,36 @@ export default function AlertRow({ alert, onEdit, onDuplicate, onDelete, onToggl
     if (!current || !target) return '—';
     const diff = ((current - target) / target) * 100;
     const color = diff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-    const sign = diff >= 0 ? '+' : '';
     return (
       <span style={{ color, fontWeight: 600, fontFamily: 'monospace' }}>
-        {sign}{diff.toFixed(2)}%
+        {Math.abs(diff).toFixed(2)}%
       </span>
     );
   }
 
+  const rowRef = useRef(null);
+
+  useEffect(() => {
+    if (!onVisibilityChange) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        onVisibilityChange(alert.ticker, entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+
+    if (rowRef.current) {
+      observer.observe(rowRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [alert.ticker, onVisibilityChange]);
+
   return (
-    <tr>
+    <tr ref={rowRef}>
       <td>
         <span className={`status-dot ${statusClass}`} title={statusClass}></span>
       </td>

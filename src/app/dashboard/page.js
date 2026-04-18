@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingAlert, setEditingAlert] = useState(null);
   const [prices, setPrices] = useState({});
+  const [visibleTickers, setVisibleTickers] = useState({}); // { ticker: boolean }
 
   // Fetch alerts
   const fetchAlerts = useCallback(async () => {
@@ -37,13 +38,19 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Fetch live prices for user's tickers
+  // Fetch live prices for visible tickers
   const fetchPrices = useCallback(async () => {
+    // Only fetch if tab is visible
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+    // Filter to only tickers that are currently visible on screen
     const uniqueTickers = [...new Set(alerts.map((a) => a.ticker))];
-    if (uniqueTickers.length === 0) return;
+    const tickersToFetch = uniqueTickers.filter(t => visibleTickers[t]);
+
+    if (tickersToFetch.length === 0) return;
     
     try {
-      const res = await fetch(`/api/kraken/ticker?pairs=${uniqueTickers.join(',')}`);
+      const res = await fetch(`/api/kraken/ticker?pairs=${tickersToFetch.join(',')}`);
       const data = await res.json();
       if (data.prices) setPrices(data.prices);
     } catch (error) {
@@ -56,13 +63,20 @@ export default function DashboardPage() {
     fetchPairs();
   }, [fetchAlerts, fetchPairs]);
 
-  // Refresh prices every 30 seconds
+  // Refresh prices every 5 seconds for visible rows
   useEffect(() => {
     if (alerts.length === 0) return;
     fetchPrices();
-    const interval = setInterval(fetchPrices, 30000);
+    const interval = setInterval(fetchPrices, 5000);
     return () => clearInterval(interval);
-  }, [alerts, fetchPrices]);
+  }, [alerts, fetchPrices, visibleTickers]);
+
+  const handleVisibilityChange = useCallback((ticker, isVisible) => {
+    setVisibleTickers(prev => ({
+      ...prev,
+      [ticker]: isVisible
+    }));
+  }, []);
 
   // Build a lookup: ticker symbol → human-readable name
   function getDisplayName(ticker) {
@@ -204,10 +218,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Alerts Section */}
+        {/* Active Alerts Section */}
         <div className="alerts-section">
           <div className="section-header">
-            <h2>Active Alerts ({alerts.filter((a) => a.is_active && !a.is_triggered).length})</h2>
+            <h2>Active Alerts ({alerts.filter((a) => !a.is_triggered).length})</h2>
             <div style={{ display: 'flex', gap: '10px' }}>
               {isLocalhost && (
                 <button 
@@ -256,7 +270,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {alerts.map((alert) => {
+                  {alerts.filter(a => !a.is_triggered).map((alert) => {
                     const priceEntry = Object.entries(prices).find(
                       ([key]) => key.toUpperCase().includes(alert.ticker.toUpperCase()) || key === alert.ticker
                     );
@@ -272,6 +286,7 @@ export default function DashboardPage() {
                         onDuplicate={handleDuplicate}
                         onDelete={handleDelete}
                         onToggle={handleToggle}
+                        onVisibilityChange={handleVisibilityChange}
                       />
                     );
                   })}
@@ -280,6 +295,55 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Triggered History Section */}
+        {alerts.some(a => a.is_triggered) && (
+          <div className="alerts-section" style={{ marginTop: '48px' }}>
+            <div className="section-header">
+              <h2 style={{ color: 'var(--text-secondary)' }}>Alert History</h2>
+            </div>
+            
+            <div className="glass-card" style={{ overflow: 'hidden', opacity: 0.8 }}>
+              <table className="alerts-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 36 }}></th>
+                    <th>Ticker</th>
+                    <th>Platform</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Current Price</th>
+                    <th>Diff %</th>
+                    <th>Last Triggered</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alerts.filter(a => a.is_triggered).map((alert) => {
+                    const priceEntry = Object.entries(prices).find(
+                      ([key]) => key.toUpperCase().includes(alert.ticker.toUpperCase()) || key === alert.ticker
+                    );
+                    const currentPrice = priceEntry ? priceEntry[1].last : null;
+
+                    return (
+                      <AlertRow
+                        key={alert.id}
+                        alert={alert}
+                        displayName={getDisplayName(alert.ticker)}
+                        currentPrice={currentPrice}
+                        onEdit={handleEdit}
+                        onDuplicate={handleDuplicate}
+                        onDelete={handleDelete}
+                        onToggle={handleToggle}
+                        onVisibilityChange={handleVisibilityChange}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Alert Form Modal */}
