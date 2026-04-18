@@ -26,9 +26,65 @@ export default function AlertForm({ alert, onSave, onClose, pairs }) {
 
   const isBollinger = form.alert_type.startsWith('bollinger_');
 
-  const filteredPairs = (pairs || []).filter((p) =>
-    (p.wsname || p.altname || '').toLowerCase().includes(pairSearch.toLowerCase())
-  ).slice(0, 25);
+  // Known descriptions for confusing token variants
+  const tokenDescriptions = {
+    'WBTC': 'Wrapped BTC (ERC-20)',
+    'TBTC': 'Threshold BTC (DeFi)',
+    'WETH': 'Wrapped ETH (ERC-20)',
+    'STETH': 'Lido Staked ETH',
+    'RETH': 'Rocket Pool ETH',
+    'CBETH': 'Coinbase Staked ETH',
+    'MSOL': 'Marinade Staked SOL',
+    'BSOL': 'BlazeStake SOL',
+    'JITOSOL': 'Jito Staked SOL',
+    'PAXG': 'Gold-Backed Token',
+    'XAUT': 'Tether Gold',
+    'USDT': 'Tether Stablecoin',
+    'USDC': 'USD Coin Stablecoin',
+    'DAI': 'MakerDAO Stablecoin',
+  };
+
+  function getTokenDescription(pair) {
+    const base = (pair.base || '').replace(/^X/, '').replace(/^Z/, '');
+    return tokenDescriptions[base] || tokenDescriptions[pair.altname] || null;
+  }
+
+  // Smart search: prioritize exact base matches, then prefix, then includes
+  const filteredPairs = (() => {
+    const query = pairSearch.toLowerCase().trim();
+    if (!query) return (pairs || []).slice(0, 25);
+
+    const matches = (pairs || []).filter((p) =>
+      (p.wsname || p.altname || '').toLowerCase().includes(query)
+    );
+
+    // Score each match for sorting
+    return matches
+      .map((p) => {
+        const name = (p.wsname || p.altname || '').toLowerCase();
+        const base = (p.base || '').replace(/^X/, '').replace(/^Z/, '').toLowerCase();
+        let score = 0;
+
+        // Exact base match (user typed "btc", base IS "btc") → highest priority
+        if (base === query) score += 100;
+        // Base starts with query
+        else if (base.startsWith(query)) score += 50;
+        // Name starts with query (e.g. "BTC/USD")
+        else if (name.startsWith(query)) score += 40;
+        // Otherwise it's just an "includes" match (WBTC, TBTC, etc.)
+
+        // Boost main quote currencies (USD > EUR)
+        const quote = (p.quote || '').replace(/^Z/, '');
+        if (quote === 'USD' || quote === 'ZUSD') score += 10;
+
+        // Boost spot over perp for sorting (both still shown)
+        if (p.type === 'spot') score += 5;
+
+        return { ...p, _score: score };
+      })
+      .sort((a, b) => b._score - a._score)
+      .slice(0, 25);
+  })();
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
